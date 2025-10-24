@@ -3,9 +3,17 @@ import { createMollieClient } from '@mollie/api-client';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import crypto from 'crypto';
 
-const mollieClient = createMollieClient({
-  apiKey: process.env.MOLLIE_API_KEY!,
-});
+/**
+ * Get Mollie client instance (lazy initialization)
+ * Only creates client when actually needed, not at build time
+ */
+function getMollieClient() {
+  const apiKey = process.env.MOLLIE_API_KEY;
+  if (!apiKey || apiKey === 'test_placeholder') {
+    throw new Error('Mollie API key not configured');
+  }
+  return createMollieClient({ apiKey });
+}
 
 /**
  * Verifies Mollie webhook signature for security
@@ -14,6 +22,7 @@ const mollieClient = createMollieClient({
 async function verifyMollieWebhook(paymentId: string): Promise<boolean> {
   try {
     // Verify by fetching from Mollie API - if it exists, it's legitimate
+    const mollieClient = getMollieClient();
     await mollieClient.payments.get(paymentId);
     return true;
   } catch (error) {
@@ -47,6 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get payment details from Mollie (already verified above)
+    const mollieClient = getMollieClient();
     const payment = await mollieClient.payments.get(paymentId);
 
     if (payment.status === 'paid') {
