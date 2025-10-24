@@ -1,15 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
+import { config, validateConfig } from '@/lib/config';
+
+// Validate configuration on module load
+// This will throw a helpful error if env vars are missing
+validateConfig();
 
 // Client-side Supabase client (for browser)
 export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  config.supabase.url,
+  config.supabase.anonKey
 );
 
 // Server-side Supabase admin client (with service role key)
 export const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  config.supabase.url,
+  config.supabase.serviceRoleKey,
   {
     auth: {
       autoRefreshToken: false,
