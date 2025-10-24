@@ -1,5 +1,5 @@
 import axios from 'axios';
-import crypto from 'crypto';
+import { decrypt } from '@/lib/encryption';
 
 export class TrelloService {
   private apiKey: string;
@@ -8,20 +8,16 @@ export class TrelloService {
 
   constructor(token: string) {
     this.apiKey = process.env.TRELLO_API_KEY!;
-    this.token = this.decryptToken(token);
     this.encryptionKey = process.env.ENCRYPTION_KEY!;
+    if (!this.encryptionKey || this.encryptionKey.length < 32) {
+      throw new Error('ENCRYPTION_KEY environment variable must be at least 32 characters');
+    }
+    this.token = this.decryptToken(token);
   }
 
   private decryptToken(encryptedToken: string): string {
     try {
-      const decipher = crypto.createDecipheriv(
-        'aes-256-cbc',
-        Buffer.from(this.encryptionKey),
-        Buffer.alloc(16, 0)
-      );
-      let decrypted = decipher.update(encryptedToken, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
-      return decrypted;
+      return decrypt(encryptedToken, this.encryptionKey);
     } catch (error) {
       // If decryption fails, assume token is not encrypted yet
       return encryptedToken;
@@ -45,8 +41,8 @@ export class TrelloService {
       );
       return response.data;
     } catch (error) {
-      console.error(`Error fetching Trello board ${boardId}:`, error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to fetch Trello board');
     }
   }
 
@@ -65,8 +61,8 @@ export class TrelloService {
       );
       return response.data;
     } catch (error) {
-      console.error(`Error fetching cards for board ${boardId}:`, error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to fetch Trello cards');
     }
   }
 
@@ -83,8 +79,8 @@ export class TrelloService {
       );
       return response.data;
     } catch (error) {
-      console.error(`Error fetching attachments for card ${cardId}:`, error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to fetch attachments');
     }
   }
 
@@ -108,8 +104,8 @@ export class TrelloService {
 
       return fullBackup;
     } catch (error) {
-      console.error('Error exporting Trello board:', error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to export Trello board');
     }
   }
 }

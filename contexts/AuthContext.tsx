@@ -49,17 +49,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Create profile if signup successful
-    if (result.data.user) {
-      await supabase
-        .from('profiles')
-        .insert({
-          id: result.data.user.id,
-          email: result.data.user.email,
-          subscription_plan: 'free',
-          subscription_status: 'active'
-        });
-    }
+    // Profile creation is now handled by database trigger
+    // If trigger fails, the auth user will be orphaned but can be fixed
+    // This prevents race conditions and ensures atomic operation
 
     return result;
   };

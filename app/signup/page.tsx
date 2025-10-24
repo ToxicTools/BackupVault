@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
+import { validatePasswordStrength, getStrengthLabel, getStrengthColor } from '@/lib/password-validation';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -20,10 +21,33 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState<{score: number, feedback: string[], isValid: boolean} | null>(null);
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPassword = e.target.value;
+    setPassword(newPassword);
+    if (newPassword) {
+      setPasswordStrength(validatePasswordStrength(newPassword));
+    } else {
+      setPasswordStrength(null);
+    }
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Validate password strength
+    const strength = validatePasswordStrength(password);
+    if (!strength.isValid) {
+      toast({
+        title: 'Weak Password',
+        description: 'Please use a stronger password. ' + strength.feedback.join(', '),
+        variant: 'destructive',
+      });
+      setLoading(false);
+      return;
+    }
 
     try {
       const { error } = await signUp(email, password);
@@ -83,12 +107,32 @@ export default function SignupPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Min. 8 characters"
+                placeholder="Min. 12 characters, mixed case, numbers & symbols"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={handlePasswordChange}
                 required
-                minLength={8}
+                minLength={12}
               />
+              {passwordStrength && (
+                <div className="mt-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${getStrengthColor(passwordStrength.score)} transition-all`}
+                        style={{ width: `${(passwordStrength.score / 4) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium">{getStrengthLabel(passwordStrength.score)}</span>
+                  </div>
+                  {passwordStrength.feedback.length > 0 && (
+                    <ul className="text-xs text-gray-600 space-y-1">
+                      {passwordStrength.feedback.slice(0, 3).map((item, i) => (
+                        <li key={i}>• {item}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Creating account...' : 'Create Account'}

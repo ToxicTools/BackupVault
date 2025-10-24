@@ -1,7 +1,7 @@
 import { Dropbox } from 'dropbox';
 import { google } from 'googleapis';
 import axios from 'axios';
-import crypto from 'crypto';
+import { encrypt, decrypt, sanitizeFileName } from '@/lib/encryption';
 
 export class StorageService {
   private provider: string;
@@ -9,21 +9,17 @@ export class StorageService {
   private encryptionKey: string;
 
   constructor(provider: string, accessToken: string) {
+    this.encryptionKey = process.env.ENCRYPTION_KEY!;
+    if (!this.encryptionKey || this.encryptionKey.length < 32) {
+      throw new Error('ENCRYPTION_KEY environment variable must be at least 32 characters');
+    }
     this.provider = provider;
     this.accessToken = this.decryptToken(accessToken);
-    this.encryptionKey = process.env.ENCRYPTION_KEY!;
   }
 
   private decryptToken(encryptedToken: string): string {
     try {
-      const decipher = crypto.createDecipheriv(
-        'aes-256-cbc',
-        Buffer.from(this.encryptionKey),
-        Buffer.alloc(16, 0)
-      );
-      let decrypted = decipher.update(encryptedToken, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
-      return decrypted;
+      return decrypt(encryptedToken, this.encryptionKey);
     } catch (error) {
       // If decryption fails, assume token is not encrypted yet
       return encryptedToken;
@@ -31,28 +27,24 @@ export class StorageService {
   }
 
   private encryptData(data: string): Buffer {
-    const cipher = crypto.createCipheriv(
-      'aes-256-cbc',
-      Buffer.from(this.encryptionKey),
-      Buffer.alloc(16, 0)
-    );
-    let encrypted = cipher.update(data, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return Buffer.from(encrypted, 'hex');
+    const encryptedString = encrypt(data, this.encryptionKey);
+    return Buffer.from(encryptedString, 'utf8');
   }
 
   async uploadFile(fileName: string, content: any): Promise<string> {
+    // Sanitize filename to prevent path traversal
+    const safeFileName = sanitizeFileName(fileName);
     const encryptedContent = this.encryptData(JSON.stringify(content));
 
     switch (this.provider) {
       case 'dropbox':
-        return await this.uploadToDropbox(fileName, encryptedContent);
+        return await this.uploadToDropbox(safeFileName, encryptedContent);
       case 'google_drive':
-        return await this.uploadToGoogleDrive(fileName, encryptedContent);
+        return await this.uploadToGoogleDrive(safeFileName, encryptedContent);
       case 'onedrive':
-        return await this.uploadToOneDrive(fileName, encryptedContent);
+        return await this.uploadToOneDrive(safeFileName, encryptedContent);
       case 'backblaze':
-        return await this.uploadToBackblaze(fileName, encryptedContent);
+        return await this.uploadToBackblaze(safeFileName, encryptedContent);
       default:
         throw new Error(`Unsupported storage provider: ${this.provider}`);
     }
@@ -69,8 +61,8 @@ export class StorageService {
       });
       return response.result.path_display || '';
     } catch (error) {
-      console.error('Error uploading to Dropbox:', error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to upload to Dropbox');
     }
   }
 
@@ -94,8 +86,8 @@ export class StorageService {
 
       return response.data.id || '';
     } catch (error) {
-      console.error('Error uploading to Google Drive:', error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to upload to Google Drive');
     }
   }
 
@@ -113,8 +105,8 @@ export class StorageService {
       );
       return response.data.id;
     } catch (error) {
-      console.error('Error uploading to OneDrive:', error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to upload to OneDrive');
     }
   }
 

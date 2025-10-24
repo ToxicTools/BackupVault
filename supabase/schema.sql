@@ -122,3 +122,29 @@ CREATE POLICY "Users can view own backups" ON public.backups
 
 CREATE POLICY "Users can view own usage" ON public.usage_tracking
   FOR ALL USING (auth.uid() = user_id);
+
+-- Function to handle user registration and profile creation
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, subscription_plan, subscription_status)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    'free',
+    'active'
+  );
+  RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Log error but don't fail user creation
+    RAISE WARNING 'Error creating profile for user %: %', NEW.id, SQLERRM;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to automatically create profile on user signup
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();

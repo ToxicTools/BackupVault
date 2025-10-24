@@ -1,5 +1,5 @@
 import axios from 'axios';
-import crypto from 'crypto';
+import { decrypt } from '@/lib/encryption';
 
 interface NotionPage {
   id: string;
@@ -12,20 +12,16 @@ export class NotionService {
   private encryptionKey: string;
 
   constructor(accessToken: string) {
-    this.accessToken = this.decryptToken(accessToken);
     this.encryptionKey = process.env.ENCRYPTION_KEY!;
+    if (!this.encryptionKey || this.encryptionKey.length < 32) {
+      throw new Error('ENCRYPTION_KEY environment variable must be at least 32 characters');
+    }
+    this.accessToken = this.decryptToken(accessToken);
   }
 
   private decryptToken(encryptedToken: string): string {
     try {
-      const decipher = crypto.createDecipheriv(
-        'aes-256-cbc',
-        Buffer.from(this.encryptionKey),
-        Buffer.alloc(16, 0)
-      );
-      let decrypted = decipher.update(encryptedToken, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
-      return decrypted;
+      return decrypt(encryptedToken, this.encryptionKey);
     } catch (error) {
       // If decryption fails, assume token is not encrypted yet
       return encryptedToken;
@@ -49,8 +45,8 @@ export class NotionService {
       );
       return response.data.results;
     } catch (error) {
-      console.error('Error fetching Notion pages:', error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to fetch Notion pages');
     }
   }
 
@@ -67,8 +63,8 @@ export class NotionService {
       );
       return response.data;
     } catch (error) {
-      console.error(`Error fetching page content for ${pageId}:`, error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to fetch page content');
     }
   }
 
@@ -89,8 +85,8 @@ export class NotionService {
       );
       return response.data.results;
     } catch (error) {
-      console.error('Error fetching Notion databases:', error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to fetch Notion databases');
     }
   }
 
@@ -112,8 +108,8 @@ export class NotionService {
 
       return fullBackup;
     } catch (error) {
-      console.error('Error exporting workspace:', error);
-      throw error;
+      // Don't log sensitive error details
+      throw new Error('Failed to export workspace');
     }
   }
 }
