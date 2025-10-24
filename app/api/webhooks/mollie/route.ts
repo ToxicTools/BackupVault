@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createMollieClient } from '@mollie/api-client';
+import { createMollieClient } from '@mollie/api-client';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import crypto from 'crypto';
 
